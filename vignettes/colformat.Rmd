@@ -17,7 +17,7 @@ When, in the course of human events, it becomes necessary for one people to diss
 library(dplyr)
 library(colformat)
 library(purrr)
-devtools::load_all()
+library(tibble)
 ```
 
 ### Canned Example
