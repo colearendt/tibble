@@ -1,0 +1,88 @@
+---
+title: "Column Formatting"
+author: "Cole Arendt"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Column Formatting in a Tibble
+
+When, in the course of human events, it becomes necessary for one people to dissolve the technical bonds which have connected them with another, they ought first evaluate whether that dissolution is necessary.  If the reason is the need to custom format a column within a `tibble`, they are fortunate, as there is a (budding) framework for doing so.  This is done through the `colformat` package.  Let's explore by first loading a few necessary packages.
+
+```{r load, echo=TRUE, message=FALSE}
+library(dplyr)
+library(colformat)
+library(purrr)
+devtools::load_all()
+```
+
+### Canned Example
+
+At the core, this functionality is accomplished by passing a `colformat` column to the `tibble`, which overrides the typical `tibble` formatting.  The `colformat` package has several canned formats that can be utilized out of the box.  Note the need to first create a handful of S3 methods.
+
+```{r s3_prep, echo=TRUE}
+## Colformat S3
+`[.colformat` <- function(x, ...) {
+  structure(NextMethod(), class='colformat')
+}
+
+## Decimal Format S3
+as.data.frame.decimal_format <- function(x,...) {
+  as.data.frame(as.list(x), stringsAsFactors=FALSE)
+}
+`[.decimal_format` <- function(x,  ...) {
+  structure(NextMethod(), class=c('decimal_format'))
+}
+
+## Column S3
+as.data.frame.column <- function(x, ...) {
+  as.data.frame(as.character(x), stringsAsFactors=FALSE)
+}
+```
+
+Now we can use an example from the `colformat` README.md.  Unfortunately, `format.data.frame` is currently a problem here.  It cuts off our last two rows with a warning.  Admittedly, this needs more work:
+
+```{r decimal_format, echo=TRUE, warning=TRUE}
+ex <- 123456789 * (10 ^ c(1, -3, -5, NA, -8, -10))
+data_frame(test=colformat(ex))
+```
+
+### Custom Example
+
+An example that works, and is necessary for the `tidyjson` package, is altering the default `tibble` behavior to quote quotes.  We will define a class that has a corresponding `colformat` method.  Beware, here, as I am using unexported objects from the `colformat` package.
+
+```{r json_str, echo=TRUE}
+## Define S3 methods
+colformat.json_str <- function(x, ...) {
+  colformat:::new_colformat(x)
+}
+
+`[.json_str` <- function(x,...) {
+  structure(NextMethod(), class='json_str')
+}
+
+## Define our object
+json <- c('"hello"','{"json":"yep"}')
+class(json) <- c(class(json),'json_str')
+
+## Notice the difference between the columns
+data_frame(orig=json) %>% mutate(formatted=colformat(json))
+
+```
+
+As you can see, the left column (`orig`) uses the `tibble` default print method for columns that match on `is.character()`.  The right column (`formatted`) bypasses that check since it has a `colformat`.  It uses our custom method and looks like actual JSON.
+
+### Future Development
+
+Ok, let's be honest, this is probably a bit too naive of an implementation, requires several S3 methods that we probably do not want to implement, and uses the `colformat` package in a way that it is currently not intended to be used.  In any case, it does illustrate the type of behavior that will soon be possible. 
+
+Some thoughts:
+
+- Need `colformat` package to have a nice way to create your own formats
+- Perhaps all of the `tibble` default formats (lists, characters, etc.) could just be `colformats`?
+- Does the user really need to call `colformat` on the column that they want to format?  Perhaps the `tibble` should look for a `colformat` S3 method when executing  (this might work nicely with the above).
+- The `colformat` package has several classes (decimal_format, column, colformat, etc.), which requires several different flavors of S3 methods.  Not sure of the differences between these, but I presume that the implementation will stabilize as the API is developed.

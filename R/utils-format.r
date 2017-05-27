@@ -77,9 +77,13 @@ shrink_mat <- function(df, width, rows, n, star) {
   extra_wide <- (seq_along(df) > max_cols)
   df[] <- df[!extra_wide]
 
+  # Flag and protect colformat classes
+  is_colformat <- map_lgl(df, inherits, colformat_class)
+
   # List columns need special treatment because format can't be trusted
   classes <- paste0("<", map_chr(df, type_sum), ">")
   is_list <- map_lgl(df, is.list)
+  is_list <- !is_colformat & is_list
   df[is_list] <- map(df[is_list], function(x) {
     summary <- obj_sum(x)
     paste0("<", summary, ">")
@@ -87,6 +91,7 @@ shrink_mat <- function(df, width, rows, n, star) {
 
   # Character columns need special treatment because of NA and escapes
   is_character <- map_lgl(df, is.character)
+  is_character <- !is_colformat & is_character
   df[is_character] <- map(df[is_character], format_character)
 
   mat <- format(df, justify = "left")
@@ -372,3 +377,5 @@ quote_n.default <- function(x) as.character(x)
 quote_n.character <- function(x) tick(x)
 
 collapse <- function(x) paste(x, collapse = ", ")
+
+colformat_class <- c('colformat','decimal_format','scientific_format')
